@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from backend.app.api.datasets import router as datasets_router
 from backend.app.api.experiments import router as experiments_router
 from backend.app.db.init_db import init_db
 
@@ -20,6 +21,7 @@ app = FastAPI(
 )
 
 app.include_router(experiments_router)
+app.include_router(datasets_router)
 
 
 @app.get("/health")
