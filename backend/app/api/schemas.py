@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ExperimentCreate(BaseModel):
@@ -61,3 +61,27 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChunkResponse(BaseModel):
+    id: int
+    document_id: int
+    content: str
+    chunk_index: int
+    start_char: int
+    end_char: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChunkDocumentRequest(BaseModel):
+    chunk_size: int = Field(default=500, gt=0)
+    overlap: int = Field(default=50, ge=0)
+
+    @model_validator(mode="after")
+    def validate_overlap(self):
+        if self.overlap >= self.chunk_size:
+            raise ValueError("overlap must be smaller than chunk_size")
+
+        return self

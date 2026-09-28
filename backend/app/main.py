@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from backend.app.api.chunks import router as chunks_router
 from backend.app.api.datasets import router as datasets_router
 from backend.app.api.documents import router as documents_router
 from backend.app.api.experiments import router as experiments_router
@@ -24,6 +25,7 @@ app = FastAPI(
 app.include_router(experiments_router)
 app.include_router(datasets_router)
 app.include_router(documents_router)
+app.include_router(chunks_router)
 
 
 @app.get("/health")

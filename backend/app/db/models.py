@@ -60,3 +60,26 @@ class Document(Base):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id"),
+        nullable=False,
+    )
+
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    chunk_index: Mapped[int] = mapped_column(nullable=False)
+    start_char: Mapped[int] = mapped_column(nullable=False)
+    end_char: Mapped[int] = mapped_column(nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
