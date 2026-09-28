@@ -36,3 +36,28 @@ class DatasetResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentCreate(BaseModel):
+    dataset_id: int
+    name: str
+    content: str
+    source: str | None = None
+
+
+class DocumentUpdate(BaseModel):
+    name: str
+    content: str
+    source: str | None = None
+
+
+class DocumentResponse(BaseModel):
+    id: int
+    dataset_id: int
+    name: str
+    content: str
+    source: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
