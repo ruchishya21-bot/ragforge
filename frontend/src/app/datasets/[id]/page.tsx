@@ -32,7 +32,7 @@ type Chunk = {
   created_at: string;
 };
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://ragforge-api-8tv4.onrender.com";
 
 export default function DatasetDetailPage() {
   const params = useParams();
@@ -44,6 +44,13 @@ export default function DatasetDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Edit state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => {
     if (!datasetId || Number.isNaN(datasetId)) {
@@ -118,6 +125,81 @@ export default function DatasetDetailPage() {
     loadDataset();
   }, [datasetId]);
 
+  function openEdit() {
+    if (!dataset) {
+      return;
+    }
+
+    setEditName(dataset.name);
+    setEditDescription(dataset.description || "");
+    setEditError("");
+    setIsEditing(true);
+  }
+
+  function closeEdit() {
+    if (saving) {
+      return;
+    }
+
+    setIsEditing(false);
+    setEditError("");
+  }
+
+  async function saveDataset() {
+    if (!editName.trim()) {
+      setEditError("Dataset name is required.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setEditError("");
+
+      const response = await fetch(
+        `${API_BASE_URL}/datasets/${datasetId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: editName.trim(),
+            description: editDescription.trim() || null,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        let message = "Failed to update dataset.";
+
+        try {
+          const errorData = await response.json();
+
+          if (typeof errorData.detail === "string") {
+            message = errorData.detail;
+          }
+        } catch {
+          // Keep default error message.
+        }
+
+        throw new Error(message);
+      }
+
+      const updatedDataset: Dataset = await response.json();
+
+      setDataset(updatedDataset);
+      setIsEditing(false);
+    } catch (err) {
+      setEditError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update the dataset.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <section className="registry-state">
@@ -180,7 +262,11 @@ export default function DatasetDetailPage() {
         </div>
 
         <div className="detail-actions">
-          <button className="secondary-button">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={openEdit}
+          >
             Edit
           </button>
 
@@ -189,6 +275,69 @@ export default function DatasetDetailPage() {
           </Link>
         </div>
       </header>
+
+      {isEditing && (
+        <section className="detail-panel dataset-edit-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="eyebrow">DATASET SETTINGS</span>
+              <h2>Edit dataset</h2>
+            </div>
+          </div>
+
+          <div className="dataset-edit-form">
+            <label>
+              Dataset name
+              <input
+                type="text"
+                value={editName}
+                onChange={(event) => setEditName(event.target.value)}
+                placeholder="Dataset name"
+                disabled={saving}
+              />
+            </label>
+
+            <label>
+              Description
+              <textarea
+                value={editDescription}
+                onChange={(event) =>
+                  setEditDescription(event.target.value)
+                }
+                placeholder="Describe what this dataset contains..."
+                rows={4}
+                disabled={saving}
+              />
+            </label>
+
+            {editError && (
+              <div className="documents-error">
+                {editError}
+              </div>
+            )}
+
+            <div className="dataset-edit-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeEdit}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="primary-button"
+                onClick={saveDataset}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <nav className="detail-tabs">
         <Link className="active" href={`/datasets/${dataset.id}`}>
@@ -203,13 +352,9 @@ export default function DatasetDetailPage() {
           Chunks
         </Link>
 
-        <Link href="/retrieval">
-          Retrieval
-        </Link>
+        <Link href="/retrieval">Retrieval</Link>
 
-        <Link href="/evaluation">
-          Evaluations
-        </Link>
+        <Link href="/evaluation">Evaluations</Link>
       </nav>
 
       <section className="detail-stats">
@@ -425,9 +570,7 @@ export default function DatasetDetailPage() {
       </section>
 
       <footer className="resource-footer">
-        <span>
-          Dataset #{dataset.id}
-        </span>
+        <span>Dataset #{dataset.id}</span>
 
         <span>
           Updated{" "}

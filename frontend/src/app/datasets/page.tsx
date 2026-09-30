@@ -11,7 +11,7 @@ type Dataset = {
   updated_at: string;
 };
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://ragforge-api-8tv4.onrender.com";
 
 export default function DatasetsPage() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
