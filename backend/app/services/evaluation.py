@@ -1,14 +1,12 @@
 import json
 import re
 
-import httpx
 from fastembed import TextEmbedding
+
+from backend.app.services.llm import generate_answer
 
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
-
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-LLM_MODEL_NAME = "llama3.2:3b"
 
 _model = None
 
@@ -134,12 +132,15 @@ provided context.
 Do not use outside knowledge.
 
 QUESTION:
+
 {question}
 
 CONTEXT:
+
 {context}
 
 GENERATED ANSWER:
+
 {actual_answer}
 
 Evaluate whether the generated answer is fully supported by the context.
@@ -153,34 +154,19 @@ Return ONLY valid JSON in exactly this format:
 Scoring rules:
 
 1.0 = all important claims are directly supported by the context.
+
 0.75 = most claims are supported, with a minor unsupported detail.
+
 0.50 = some claims are supported but important claims are unsupported.
+
 0.25 = very little of the answer is supported.
+
 0.0 = the answer is not supported by the context.
 
 Do not include explanations.
 """
 
-    payload = {
-        "model": LLM_MODEL_NAME,
-        "prompt": prompt,
-        "stream": False,
-        "format": "json",
-    }
-
-    async with httpx.AsyncClient(
-        timeout=120.0
-    ) as client:
-        response = await client.post(
-            OLLAMA_URL,
-            json=payload,
-        )
-
-        response.raise_for_status()
-
-        data = response.json()
-
-    evaluator_response = data["response"]
+    evaluator_response = await generate_answer(prompt)
 
     parsed = _extract_json_object(
         evaluator_response
