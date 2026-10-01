@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'ragforge-api'
+        PYTHON = 'C:\\Users\\ruchi\\AppData\\Local\\Programs\\Python\\Python314\\python.exe'
     }
 
     stages {
@@ -15,21 +16,21 @@ pipeline {
 
         stage('Python Setup') {
             steps {
-                bat 'python --version'
-                bat 'pip --version'
+                bat '"%PYTHON%" --version'
+                bat '"%PYTHON%" -m pip --version'
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                bat 'python -m pip install --upgrade pip'
-                bat 'pip install -r requirements.txt'
+                bat '"%PYTHON%" -m pip install --upgrade pip'
+                bat '"%PYTHON%" -m pip install -r requirements.txt'
             }
         }
 
         stage('Compile Check') {
             steps {
-                bat 'python -m compileall backend'
+                bat '"%PYTHON%" -m compileall backend'
             }
         }
 
