@@ -253,6 +253,41 @@ export default function EvaluationPage() {
     return `${(value * 100).toFixed(1)}%`;
   }
 
+  /**
+   * Converts the backend timestamp into the user's actual local
+   * world-clock time.
+   *
+   * Backend timestamps that already contain a timezone offset or
+   * "Z" are preserved.
+   *
+   * If the backend sends a timezone-less timestamp, it is treated
+   * as UTC and then converted to the browser's local timezone.
+   */
+  function formatTimestamp(timestamp: string) {
+    if (!timestamp) {
+      return "—";
+    }
+
+    const hasTimezone =
+      timestamp.endsWith("Z") ||
+      /[+-]\d{2}:\d{2}$/.test(timestamp);
+
+    const normalizedTimestamp = hasTimezone
+      ? timestamp
+      : `${timestamp}Z`;
+
+    const date = new Date(normalizedTimestamp);
+
+    if (Number.isNaN(date.getTime())) {
+      return "—";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "medium",
+    }).format(date);
+  }
+
   if (loading) {
     return (
       <section className="registry-state">
@@ -451,9 +486,7 @@ export default function EvaluationPage() {
                         </span>
 
                         <span>
-                          {new Date(
-                            result.created_at,
-                          ).toLocaleString()}
+                          {formatTimestamp(result.created_at)}
                         </span>
                       </div>
 
