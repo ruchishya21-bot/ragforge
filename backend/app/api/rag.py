@@ -27,7 +27,10 @@ async def ask_rag(
     request: RetrievalRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    dataset = await db.get(Dataset, request.dataset_id)
+    dataset = await db.get(
+        Dataset,
+        request.dataset_id,
+    )
 
     if dataset is None:
         raise HTTPException(
@@ -35,13 +38,23 @@ async def ask_rag(
             detail="Dataset not found",
         )
 
-    query_vector = embed_text(request.query)
+    query_vector = embed_text(
+        request.query
+    )
 
-    distance = Chunk.embedding.cosine_distance(query_vector)
+    distance = Chunk.embedding.cosine_distance(
+        query_vector
+    )
 
     statement = (
-        select(Chunk, distance.label("distance"))
-        .join(Document, Document.id == Chunk.document_id)
+        select(
+            Chunk,
+            distance.label("distance"),
+        )
+        .join(
+            Document,
+            Document.id == Chunk.document_id,
+        )
         .where(
             Document.dataset_id == request.dataset_id,
             Chunk.embedding.is_not(None),
@@ -50,7 +63,9 @@ async def ask_rag(
         .limit(request.top_k)
     )
 
-    result = await db.execute(statement)
+    result = await db.execute(
+        statement
+    )
 
     rows = result.all()
 
@@ -71,17 +86,22 @@ async def ask_rag(
             detail="No embedded chunks found for this dataset",
         )
 
-    context = build_context(retrieval_results)
+    context = build_context(
+        retrieval_results
+    )
 
     prompt = build_rag_prompt(
         query=request.query,
         context=context,
     )
 
-    answer = await generate_answer(prompt)
+    answer = await generate_answer(
+        prompt
+    )
 
     return {
         "query": request.query,
         "answer": answer,
+        "results": retrieval_results,
         "sources": retrieval_results,
     }

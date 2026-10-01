@@ -10,25 +10,29 @@ type Dataset = {
   description?: string | null;
 };
 
+type RetrievedChunk = {
+  chunk_id?: number;
+  document_id?: number;
+  content?: string;
+  chunk_index?: number;
+  similarity?: number;
+};
+
 type RAGResponse = {
   answer?: string;
   actual_answer?: string;
   response?: string;
   query?: string;
-  results?: Array<{
-    chunk_id: number;
-    document_id: number;
-    content: string;
-    chunk_index: number;
-    similarity: number;
-  }>;
-  context?: Array<{
-    chunk_id?: number;
-    document_id?: number;
-    content?: string;
-    chunk_index?: number;
-    similarity?: number;
-  }>;
+  results?: RetrievedChunk[];
+  context?: RetrievedChunk[];
+};
+
+type ContextChunk = {
+  chunk_id: number;
+  document_id: number;
+  content: string;
+  chunk_index: number;
+  similarity: number;
 };
 
 export default function RAGPage() {
@@ -38,11 +42,12 @@ export default function RAGPage() {
   const [topK, setTopK] = useState("5");
 
   const [answer, setAnswer] = useState("");
-  const [retrievedContext, setRetrievedContext] = useState<
-    NonNullable<RAGResponse["results"]>
-  >([]);
+  const [retrievedContext, setRetrievedContext] = useState<ContextChunk[]>(
+    []
+  );
 
   const [askedQuery, setAskedQuery] = useState("");
+  const [responseTime, setResponseTime] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -54,9 +59,7 @@ export default function RAGPage() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          `${API_BASE_URL}/datasets/`
-        );
+        const response = await fetch(`${API_BASE_URL}/datasets/`);
 
         if (!response.ok) {
           throw new Error("Failed to load datasets.");
@@ -101,6 +104,10 @@ export default function RAGPage() {
       setError("");
       setAnswer("");
       setRetrievedContext([]);
+      setAskedQuery("");
+      setResponseTime(null);
+
+      const startedAt = performance.now();
 
       const response = await fetch(`${API_BASE_URL}/rag/`, {
         method: "POST",
@@ -113,6 +120,9 @@ export default function RAGPage() {
           top_k: Number(topK),
         }),
       });
+
+      const elapsed = performance.now() - startedAt;
+      setResponseTime(elapsed);
 
       if (!response.ok) {
         const message = await response.text();
@@ -135,16 +145,18 @@ export default function RAGPage() {
         data.context ||
         [];
 
-      setAnswer(generatedAnswer);
-      setRetrievedContext(
-        context.map((item) => ({
+      const normalizedContext: ContextChunk[] = context.map(
+        (item) => ({
           chunk_id: item.chunk_id ?? 0,
           document_id: item.document_id ?? 0,
           content: item.content ?? "",
           chunk_index: item.chunk_index ?? 0,
           similarity: item.similarity ?? 0,
-        }))
+        })
       );
+
+      setAnswer(generatedAnswer);
+      setRetrievedContext(normalizedContext);
 
       setAskedQuery(
         data.query ||
@@ -170,6 +182,31 @@ export default function RAGPage() {
     [datasets, datasetId]
   );
 
+  const bestSimilarity = useMemo(() => {
+    if (retrievedContext.length === 0) {
+      return 0;
+    }
+
+    return Math.max(
+      ...retrievedContext.map(
+        (chunk) => chunk.similarity
+      )
+    );
+  }, [retrievedContext]);
+
+  const averageSimilarity = useMemo(() => {
+    if (retrievedContext.length === 0) {
+      return 0;
+    }
+
+    const total = retrievedContext.reduce(
+      (sum, chunk) => sum + chunk.similarity,
+      0
+    );
+
+    return total / retrievedContext.length;
+  }, [retrievedContext]);
+
   const hasResult =
     Boolean(answer) ||
     retrievedContext.length > 0;
@@ -182,7 +219,9 @@ export default function RAGPage() {
             RAG PLAYGROUND
           </p>
 
-          <h1>Ask your knowledge base</h1>
+          <h1>
+            Ask your knowledge base
+          </h1>
 
           <p className="rag-description">
             Run a real retrieval-augmented generation query and
@@ -199,7 +238,8 @@ export default function RAGPage() {
       {error && (
         <div className="rag-error">
           <span>!</span>
-          {error}
+
+          <p>{error}</p>
         </div>
       )}
 
@@ -210,13 +250,18 @@ export default function RAGPage() {
               QUERY
             </p>
 
-            <h2>Ask a question</h2>
+            <h2>
+              Ask a question
+            </h2>
           </div>
 
           {selectedDataset && (
             <div className="rag-dataset-label">
               <span>DATASET</span>
-              <strong>{selectedDataset.name}</strong>
+
+              <strong>
+                {selectedDataset.name}
+              </strong>
             </div>
           )}
         </div>
@@ -224,7 +269,9 @@ export default function RAGPage() {
         <form onSubmit={handleAsk}>
           <div className="rag-controls">
             <label>
-              <span>KNOWLEDGE BASE</span>
+              <span>
+                KNOWLEDGE BASE
+              </span>
 
               <select
                 value={datasetId}
@@ -251,7 +298,9 @@ export default function RAGPage() {
             </label>
 
             <label>
-              <span>TOP K</span>
+              <span>
+                TOP K
+              </span>
 
               <select
                 value={topK}
@@ -260,15 +309,25 @@ export default function RAGPage() {
                 }
                 disabled={running}
               >
-                <option value="3">3 chunks</option>
-                <option value="5">5 chunks</option>
-                <option value="10">10 chunks</option>
+                <option value="3">
+                  3 chunks
+                </option>
+
+                <option value="5">
+                  5 chunks
+                </option>
+
+                <option value="10">
+                  10 chunks
+                </option>
               </select>
             </label>
           </div>
 
           <label className="rag-question-field">
-            <span>QUESTION</span>
+            <span>
+              QUESTION
+            </span>
 
             <textarea
               value={query}
@@ -282,11 +341,21 @@ export default function RAGPage() {
 
           <div className="rag-form-footer">
             <div className="rag-pipeline-preview">
-              <span>RETRIEVE</span>
+              <span>
+                RETRIEVE
+              </span>
+
               <i>→</i>
-              <span>CONTEXT</span>
+
+              <span>
+                CONTEXT
+              </span>
+
               <i>→</i>
-              <span>GENERATE</span>
+
+              <span>
+                GENERATE
+              </span>
             </div>
 
             <button
@@ -302,12 +371,16 @@ export default function RAGPage() {
               {running ? (
                 <>
                   <span className="rag-spinner" />
+
                   Generating
                 </>
               ) : (
                 <>
                   Ask RAG
-                  <span>↗</span>
+
+                  <span>
+                    ↗
+                  </span>
                 </>
               )}
             </button>
@@ -334,6 +407,66 @@ export default function RAGPage() {
 
       {!running && hasResult && (
         <>
+          <section className="rag-run-summary">
+            <div className="rag-run-summary-item">
+              <span>
+                RETRIEVED
+              </span>
+
+              <strong>
+                {retrievedContext.length}
+              </strong>
+
+              <small>
+                context chunks
+              </small>
+            </div>
+
+            <div className="rag-run-summary-item">
+              <span>
+                BEST MATCH
+              </span>
+
+              <strong>
+                {(bestSimilarity * 100).toFixed(1)}%
+              </strong>
+
+              <small>
+                highest similarity
+              </small>
+            </div>
+
+            <div className="rag-run-summary-item">
+              <span>
+                AVG. MATCH
+              </span>
+
+              <strong>
+                {(averageSimilarity * 100).toFixed(1)}%
+              </strong>
+
+              <small>
+                average similarity
+              </small>
+            </div>
+
+            <div className="rag-run-summary-item">
+              <span>
+                RESPONSE
+              </span>
+
+              <strong>
+                {responseTime !== null
+                  ? `${(responseTime / 1000).toFixed(1)}s`
+                  : "—"}
+              </strong>
+
+              <small>
+                client round trip
+              </small>
+            </div>
+          </section>
+
           <section className="rag-answer-section">
             <div className="rag-section-heading">
               <div>
@@ -341,7 +474,9 @@ export default function RAGPage() {
                   GENERATED ANSWER
                 </p>
 
-                <h2>Response</h2>
+                <h2>
+                  Response
+                </h2>
               </div>
 
               <span className="rag-grounded-label">
@@ -356,7 +491,9 @@ export default function RAGPage() {
 
               <div className="rag-answer-content">
                 {answer ? (
-                  <p>{answer}</p>
+                  <p>
+                    {answer}
+                  </p>
                 ) : (
                   <p className="rag-no-answer">
                     The API returned no generated answer.
@@ -367,8 +504,13 @@ export default function RAGPage() {
 
             {askedQuery && (
               <div className="rag-question-reference">
-                <span>QUESTION</span>
-                <p>{askedQuery}</p>
+                <span>
+                  QUESTION
+                </span>
+
+                <p>
+                  {askedQuery}
+                </p>
               </div>
             )}
           </section>
@@ -407,15 +549,28 @@ export default function RAGPage() {
 
                       <div className="rag-context-main">
                         <div className="rag-context-meta">
-                          <span>CHUNK</span>
+                          <span>
+                            CHUNK
+                          </span>
+
                           <strong>
                             #{chunk.chunk_id}
                           </strong>
 
-                          <i>/</i>
+                          <i>
+                            /
+                          </i>
 
                           <span>
                             INDEX {chunk.chunk_index}
+                          </span>
+
+                          <i>
+                            /
+                          </i>
+
+                          <span>
+                            DOCUMENT {chunk.document_id}
                           </span>
                         </div>
 
@@ -430,10 +585,7 @@ export default function RAGPage() {
                         </span>
 
                         <strong>
-                          {(
-                            chunk.similarity * 100
-                          ).toFixed(1)}
-                          %
+                          {(chunk.similarity * 100).toFixed(1)}%
                         </strong>
 
                         <div className="rag-score-bar">
@@ -443,8 +595,7 @@ export default function RAGPage() {
                                 0,
                                 Math.min(
                                   100,
-                                  chunk.similarity *
-                                    100
+                                  chunk.similarity * 100
                                 )
                               )}%`,
                             }}
@@ -463,14 +614,30 @@ export default function RAGPage() {
       {!running && !hasResult && (
         <section className="rag-empty-state">
           <div className="rag-empty-diagram">
-            <span>Q</span>
-            <i>→</i>
-            <span>R</span>
-            <i>→</i>
-            <span>A</span>
+            <span>
+              Q
+            </span>
+
+            <i>
+              →
+            </i>
+
+            <span>
+              R
+            </span>
+
+            <i>
+              →
+            </i>
+
+            <span>
+              A
+            </span>
           </div>
 
-          <h2>Ready to query</h2>
+          <h2>
+            Ready to query
+          </h2>
 
           <p>
             Ask a question above to see how RAGForge retrieves
